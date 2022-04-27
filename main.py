@@ -8,6 +8,11 @@
 # 3. user도 캡슐화
 
 # -> 1. store 도메인 기반 언어로 변경함
+
+# 3.번 유저가 너무 많은 행위를 책임지고 있다. Store가 판매책임을 가져야하는거 아닌가
+# 개선점
+# 1. 상점에서 상품을 판매하는 행위를 추상화하고 구체적인 로직을 해당 메서드로 옮긴다.
+
 from abc import ABC, abstractmethod
 
 
@@ -22,12 +27,15 @@ class Store(ABC):
     def show_product(self, product_id):  # asis get_product(self)
         pass
 
-    @abstractmethod
-    def give_product(self, product_id):
-        pass
+    # @abstractmethod
+    # def give_product(self, product_id):
+    #     pass
+    #
+    # @abstractmethod
+    # def take_money(self, product_id):
+    #     pass
 
-    @abstractmethod
-    def take_money(self, product_id):
+    def sell_product(self, product_id, money):
         pass
 
 
@@ -49,8 +57,25 @@ class GrabStore(Store):
     def show_product(self, product_id):
         return self._products[product_id]
 
-    def give_product(self, products):
-        self._products.pop(products)  # product_id를 key로 가지는 value 삭제
+    def sell_product(self, product_id, money):
+        # validation 코드는 일단 최소화
+        product = self.show_product(product_id=product_id)
+        if not product:
+            raise Exception("상품이 존재하지 않는다")
+
+        self._take_money(money=money)
+        try:
+            _product = self._take_out_product(product_id=product_id)
+        except Exception as e:
+            self._return_money(money)
+            return _product
+            raise e
+
+    def _return_money(self, money):
+         self._money -= money
+
+    def _take_out_product(self, product_id):
+        return self.products.pop(product_id)
 
     def take_money(self, money):
         self._money += money
@@ -58,7 +83,7 @@ class GrabStore(Store):
 
 class User:
     def __init__(self, store: Store):  # 의존성을 주입. 보통 고수준 코드가 주입된다
-        self.money = 0
+        self._money = 0
         self.store = store
         self.belongs = []
 
@@ -75,20 +100,37 @@ class User:
         product = self.store.show_product(product_id=product_id)  # 좀 더 간접 접근
         return product
 
+    # asis -> 상품 판매 등등이 전부 user에서 이루어지고 있음
     def purchase_product(self, product_id):
         product = self.see_product(product_id)
+        price = product["price"]
         if self.money >= product["price"]:
             # self.store.products.pop(product_id)  # 상점에서 상품 꺼내기
-            self.store.give_product(product_id=product_id)  # 위의 비해 간접적으로 변했다. asis는 더 직접적으로 pop을 제어함
+            # self.store.give_product(product_id=product_id)  # 위의 비해 간접적으로 변했다. asis는 더 직접적으로 pop을 제어함
             self.money -= product["price"]  # 사용자가 돈 내기
             # self.store.money += product["price"]  # 상점에서 돈 받기
-            self.store.take_money(product["price"])
-            self.belongs.append(product)
+            # self.store.take_money(product["price"]) ->  3. 유저 비중 줄이기 위해 삭제
+            try:
+                my_product = self.store.sell_product(product_id=product_id, money=price)
+                self.belongs.append(product)
+                return my_product
+            except Exception as e:
+                self._take_money(money=price)
+                print("구매중 문제 발생")
+
             return product
         # 직접적으로 제어하지 않고 속성에서 제공해주는 메소드 사용. 결합도 낮아짐
         else:
             raise Exception("잔돈이 부족합니다")
 
+    def _give_money(self, money):
+        self._money -= money
+
+    def _take_money(self, money):
+        self._money += money
+
+    def _add_belong(self, product):
+        self.belongs.append(product)
 
 if __name__ == "__main__":
     user = User(store=GrabStore())
