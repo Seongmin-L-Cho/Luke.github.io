@@ -13,7 +13,18 @@
 # 개선점
 # 1. 상점에서 상품을 판매하는 행위를 추상화하고 구체적인 로직을 해당 메서드로 옮긴다.
 
+
+# 4번 .프로덕트가 책임이 필요할거 같은데
+# 개선점
+# 1. 딕셔너리 타입을 클래스(데이터클래스) 객체로 변환하자
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
+
+@dataclass
+class Product:
+    name: str
+    price: int
 
 
 class Store(ABC):
@@ -75,7 +86,7 @@ class GrabStore(Store):
          self._money -= money
 
     def _take_out_product(self, product_id):
-        return self.products.pop(product_id)
+        return self._products.pop(product_id)
 
     def take_money(self, money):
         self._money += money
@@ -103,8 +114,8 @@ class User:
     # asis -> 상품 판매 등등이 전부 user에서 이루어지고 있음
     def purchase_product(self, product_id):
         product = self.see_product(product_id)
-        price = product["price"]
-        if self.money >= product["price"]:
+        price = product.price
+        if self._check_money_enough(price=price) # asis 대비 if에 대해 좀 더 추상화 + 가독성이 좋아진다
             # self.store.products.pop(product_id)  # 상점에서 상품 꺼내기
             # self.store.give_product(product_id=product_id)  # 위의 비해 간접적으로 변했다. asis는 더 직접적으로 pop을 제어함
             self.money -= product["price"]  # 사용자가 돈 내기
@@ -123,6 +134,9 @@ class User:
         else:
             raise Exception("잔돈이 부족합니다")
 
+    def _check_money_enough(self,price):
+        return self._money >= price
+
     def _give_money(self, money):
         self._money -= money
 
@@ -133,6 +147,8 @@ class User:
         self.belongs.append(product)
 
 if __name__ == "__main__":
-    user = User(store=GrabStore())
-    user.set_money(100000)
+    store =GrabStore(products={1:Product(name="키보드", price=30000),
+                               2:Product(name="키보드", price=30000)})
+
+    user = User(money=10000,store=store)
     user.purchase_product(product_id=1)
